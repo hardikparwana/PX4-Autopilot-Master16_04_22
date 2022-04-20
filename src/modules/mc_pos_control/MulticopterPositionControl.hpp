@@ -65,6 +65,9 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 
+// External Controller
+#include <uORB/topics/external_controller.h>
+
 using namespace time_literals;
 
 class MulticopterPositionControl : public ModuleBase<MulticopterPositionControl>, public control::SuperBlock,
@@ -110,6 +113,11 @@ private:
 
 	vehicle_local_position_setpoint_s _setpoint {};
 	vehicle_control_mode_s _vehicle_control_mode {};
+
+	// External Controller  /////////////////////////////
+	uORB::Subscription _external_controller_sub {ORB_ID(external_controller)};
+	external_controller_s _external_controller {};
+	///////////////////////////////////////////////////////
 
 	vehicle_constraints_s _vehicle_constraints {
 		.timestamp = 0,

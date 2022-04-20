@@ -37,6 +37,8 @@ cmake_policy(SET CMP0057 NEW)
 include(px4_list_make_absolute)
 
 set(msg_files
+	external_controller.msg
+	external_actuator_controls.msg
 	action_request.msg
 	actuator_armed.msg
 	actuator_controls.msg

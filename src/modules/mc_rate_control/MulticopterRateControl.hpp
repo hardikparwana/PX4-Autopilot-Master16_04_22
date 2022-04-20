@@ -64,6 +64,11 @@
 #include <uORB/topics/vehicle_thrust_setpoint.h>
 #include <uORB/topics/vehicle_torque_setpoint.h>
 
+// External Controller ////////////////////////
+#include <uORB/topics/external_controller.h>
+#include <uORB/topics/external_actuator_controls.h>
+//////////////////////////////////////////////
+
 using namespace time_literals;
 
 class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public ModuleParams, public px4::WorkItem
@@ -95,6 +100,13 @@ private:
 
 	void publishTorqueSetpoint(const matrix::Vector3f &torque_sp, const hrt_abstime &timestamp_sample);
 	void publishThrustSetpoint(const hrt_abstime &timestamp_sample);
+
+	// External Controller
+	uORB::Subscription _external_controller_sub {ORB_ID(external_controller)};
+	external_controller_s _external_controller {};
+	uORB::Subscription _external_actuators_controls_sub{ORB_ID(external_actuator_controls)};
+	external_actuator_controls_s _external_actuator_controls {};
+	//////////////////////////////////////////
 
 	RateControl _rate_control; ///< class for rate control calculations
 

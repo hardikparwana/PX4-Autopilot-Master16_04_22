@@ -140,6 +140,13 @@ MulticopterRateControl::Run()
 		/* check for updates in other topics */
 		_v_control_mode_sub.update(&_v_control_mode);
 
+		// External Controller //////////////////
+		_external_controller_sub.update(&_external_controller); // works!!
+		// PX4_INFO("Hello Sky!Sky!");
+		// PX4_INFO("%d",_externa");
+		// PX4_INFO("%d",_external_controller.use_external_control);
+		////////////////////////////////////////
+
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
 
@@ -247,41 +254,64 @@ MulticopterRateControl::Run()
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
 
-			// publish actuator controls
-			actuator_controls_s actuators{};
-			actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
-			actuators.timestamp_sample = angular_velocity.timestamp_sample;
+			if (_v_control_mode.flag_control_offboard_enabled && _external_controller.use_external_control)
+			{
+				_external_actuators_controls_sub.update(&_external_actuator_controls);
+				PX4_INFO("Thrust: %f", (double)_external_actuator_controls.thrust);
+				// publish actuator controls
+				actuator_controls_s actuators{};
+				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(_external_actuator_controls.roll) ? _external_actuator_controls.roll : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(_external_actuator_controls.pitch) ? _external_actuator_controls.pitch : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(_external_actuator_controls.yaw) ? _external_actuator_controls.yaw : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_external_actuator_controls.thrust) ? _external_actuator_controls.thrust : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
+				actuators.timestamp_sample = angular_velocity.timestamp_sample;
 
-			if (!_vehicle_status.is_vtol) {
-				publishTorqueSetpoint(att_control, angular_velocity.timestamp_sample);
-				publishThrustSetpoint(angular_velocity.timestamp_sample);
+				actuators.timestamp = hrt_absolute_time();
+				_actuators_0_pub.publish(actuators);
+
+				updateActuatorControlsStatus(actuators, dt);
 			}
+			else
+			{
+				PX4_INFO("Thrust: %f, roll: %f, pitch: %f, yaw: %f",(double)_thrust_sp,(double)att_control(0),(double)att_control(1),(double)att_control(2));
+				// publish actuator controls
+				actuator_controls_s actuators{};
+				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
+				actuators.timestamp_sample = angular_velocity.timestamp_sample;
 
-			// scale effort by battery status if enabled
-			if (_param_mc_bat_scale_en.get()) {
-				if (_battery_status_sub.updated()) {
-					battery_status_s battery_status;
+				if (!_vehicle_status.is_vtol) {
+					publishTorqueSetpoint(att_control, angular_velocity.timestamp_sample);
+					publishThrustSetpoint(angular_velocity.timestamp_sample);
+				}
 
-					if (_battery_status_sub.copy(&battery_status) && battery_status.connected && battery_status.scale > 0.f) {
-						_battery_status_scale = battery_status.scale;
+				// scale effort by battery status if enabled
+				if (_param_mc_bat_scale_en.get()) {
+					if (_battery_status_sub.updated()) {
+						battery_status_s battery_status;
+
+						if (_battery_status_sub.copy(&battery_status) && battery_status.connected && battery_status.scale > 0.f) {
+							_battery_status_scale = battery_status.scale;
+						}
+					}
+
+					if (_battery_status_scale > 0.0f) {
+						for (int i = 0; i < 4; i++) {
+							actuators.control[i] *= _battery_status_scale;
+						}
 					}
 				}
 
-				if (_battery_status_scale > 0.0f) {
-					for (int i = 0; i < 4; i++) {
-						actuators.control[i] *= _battery_status_scale;
-					}
-				}
+				actuators.timestamp = hrt_absolute_time();
+				_actuators_0_pub.publish(actuators);
+
+				updateActuatorControlsStatus(actuators, dt);
 			}
 
-			actuators.timestamp = hrt_absolute_time();
-			_actuators_0_pub.publish(actuators);
-
-			updateActuatorControlsStatus(actuators, dt);
 
 		} else if (_v_control_mode.flag_control_termination_enabled) {
 			if (!_vehicle_status.is_vtol) {

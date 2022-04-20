@@ -324,6 +324,11 @@ void MulticopterPositionControl::Run()
 		_vehicle_control_mode_sub.update(&_vehicle_control_mode);
 		_vehicle_land_detected_sub.update(&_vehicle_land_detected);
 
+		// External Controller
+		_external_controller_sub.update(&_external_controller); // works!!
+		// PX4_INFO("Hello Sky!");
+		// PX4_INFO("%d",_external_controller.use_external_control);
+
 		if (_param_mpc_use_hte.get()) {
 			hover_thrust_estimate_s hte;
 

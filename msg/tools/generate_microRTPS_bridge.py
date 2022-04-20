@@ -210,7 +210,7 @@ else:
     fastrtps_version = re.search(r'Version:\s*([\dd.]+)', subprocess.check_output(
         "dpkg -s ros-" + ros2_distro + "-fastrtps 2>/dev/null | grep -i version", shell=True).decode("utf-8").strip()).group(1)
 
-
+print("RUNNING>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 # If nothing specified it's generated both
 if agent == False and client == False:
     agent = True
