@@ -65,8 +65,9 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 
-// External Controller
+// External Controller ////////////////////////
 #include <uORB/topics/external_controller.h>
+//////////////////////////////////////////////
 
 using namespace time_literals;
 
