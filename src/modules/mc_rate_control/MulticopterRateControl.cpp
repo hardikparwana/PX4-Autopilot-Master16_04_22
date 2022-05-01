@@ -258,14 +258,24 @@ MulticopterRateControl::Run()
 			{
 				_external_actuators_controls_sub.update(&_external_actuator_controls);
 				float tradeoff = _external_actuator_controls.tradeoff;
-				tradeoff = tradeoff*2;
-				// PX4_INFO("Thrust: %f", (double)_external_actuator_controls.thrust);
+				// tradeoff = tradeoff*2;
+				// PX4_INFO("Thrust: %f tradeoff: %f", (double)_external_actuator_controls.thrust, (double)_external_actuator_controls.tradeoff);
 				// publish actuator controls
+
+				float roll_sp = tradeoff * _external_actuator_controls.roll + (1.0f-tradeoff)*  att_control(0);
+				float pitch_sp = tradeoff * _external_actuator_controls.pitch + (1.0f-tradeoff)*  att_control(1);
+				float yaw_sp = tradeoff * _external_actuator_controls.yaw + (1.0f-tradeoff)*  att_control(2);
+				float thrust_sp = tradeoff * _external_actuator_controls.thrust + (1.0f-tradeoff)* _thrust_sp;
+
 				actuator_controls_s actuators{};
-				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(_external_actuator_controls.roll) ? _external_actuator_controls.roll : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(_external_actuator_controls.pitch) ? _external_actuator_controls.pitch : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(_external_actuator_controls.yaw) ? _external_actuator_controls.yaw : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_external_actuator_controls.thrust) ? _external_actuator_controls.thrust : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(roll_sp) ? roll_sp : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(pitch_sp) ? pitch_sp : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(yaw_sp) ? yaw_sp : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(thrust_sp) ? thrust_sp : 0.0f;
+				// actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(_external_actuator_controls.roll) ? _external_actuator_controls.roll : 0.0f;
+				// actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(_external_actuator_controls.pitch) ? _external_actuator_controls.pitch : 0.0f;
+				// actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(_external_actuator_controls.yaw) ? _external_actuator_controls.yaw : 0.0f;
+				// actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_external_actuator_controls.thrust) ? _external_actuator_controls.thrust : 0.0f;
 				actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
 				actuators.timestamp_sample = angular_velocity.timestamp_sample;
 
