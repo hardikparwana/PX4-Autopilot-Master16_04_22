@@ -254,30 +254,76 @@ MulticopterRateControl::Run()
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
 
-			if (_v_control_mode.flag_control_offboard_enabled && _external_controller.use_external_control)
+			if (_param_mc_ext_control.get() || (_v_control_mode.flag_control_offboard_enabled && _external_controller.use_external_control) )
 			{
-				_external_actuators_controls_sub.update(&_external_actuator_controls);
-				float tradeoff = _external_actuator_controls.tradeoff;
-				// tradeoff = tradeoff*2;
-				// PX4_INFO("Thrust: %f tradeoff: %f", (double)_external_actuator_controls.thrust, (double)_external_actuator_controls.tradeoff);
-				// publish actuator controls
+				// PX4_INFO("enable ext control param: %f",(double)_param_mc_ext_control.get());
+				// _external_actuators_controls_sub.update(&_external_actuator_controls);
+				// PX4_INFO("Polling external_actuators_sub now");
 
-				float roll_sp = tradeoff * _external_actuator_controls.roll + (1.0f-tradeoff)*  att_control(0);
-				float pitch_sp = tradeoff * _external_actuator_controls.pitch + (1.0f-tradeoff)*  att_control(1);
-				float yaw_sp = tradeoff * _external_actuator_controls.yaw + (1.0f-tradeoff)*  att_control(2);
-				float thrust_sp = tradeoff * _external_actuator_controls.thrust + (1.0f-tradeoff)* _thrust_sp;
+				if( _external_actuators_controls_sub.update(&_external_actuator_controls) )
+				{
+					float tradeoff_thrust = _external_actuator_controls.tradeoff_thrust;
+					float tradeoff_roll = _external_actuator_controls.tradeoff_roll;
+					float tradeoff_pitch = _external_actuator_controls.tradeoff_pitch;
+					float tradeoff_yaw = _external_actuator_controls.tradeoff_yaw;
+					// tradeoff = tradeoff*2;
+					PX4_INFO("Thrust: %f tradeoff thrust: %f roll: %f pitch %f yaw %f", (double)_external_actuator_controls.thrust, (double)_external_actuator_controls.tradeoff_thrust, (double)_external_actuator_controls.tradeoff_roll, (double)_external_actuator_controls.tradeoff_pitch, (double)_external_actuator_controls.tradeoff_yaw);
+					// publish actuator controls
 
-				actuator_controls_s actuators{};
-				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(roll_sp) ? roll_sp : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(pitch_sp) ? pitch_sp : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(yaw_sp) ? yaw_sp : 0.0f;
-				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(thrust_sp) ? thrust_sp : 0.0f;
-				// actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(_external_actuator_controls.roll) ? _external_actuator_controls.roll : 0.0f;
-				// actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(_external_actuator_controls.pitch) ? _external_actuator_controls.pitch : 0.0f;
-				// actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(_external_actuator_controls.yaw) ? _external_actuator_controls.yaw : 0.0f;
-				// actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_external_actuator_controls.thrust) ? _external_actuator_controls.thrust : 0.0f;
+					float roll_sp = tradeoff_roll * _external_actuator_controls.roll + (1.0f-tradeoff_roll)*  att_control(0);
+					float pitch_sp = tradeoff_pitch * _external_actuator_controls.pitch + (1.0f-tradeoff_pitch)*  att_control(1);
+					float yaw_sp = tradeoff_yaw * _external_actuator_controls.yaw + (1.0f-tradeoff_yaw)*  att_control(2);
+					float thrust_sp = tradeoff_thrust * _external_actuator_controls.thrust + (1.0f-tradeoff_thrust)* _thrust_sp;
+
+					actuator_controls_s actuators{};
+					actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(roll_sp) ? roll_sp : 0.0f;
+					actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(pitch_sp) ? pitch_sp : 0.0f;
+					actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(yaw_sp) ? yaw_sp : 0.0f;
+					actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(thrust_sp) ? thrust_sp : 0.0f;
+					// actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(_external_actuator_controls.roll) ? _external_actuator_controls.roll : 0.0f;
+					// actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(_external_actuator_controls.pitch) ? _external_actuator_controls.pitch : 0.0f;
+					// actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(_external_actuator_controls.yaw) ? _external_actuator_controls.yaw : 0.0f;
+					// actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_external_actuator_controls.thrust) ? _external_actuator_controls.thrust : 0.0f;
+					actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
+					actuators.timestamp_sample = angular_velocity.timestamp_sample;
+
+					// scale effort by battery status if enabled
+					if (_param_mc_bat_scale_en.get()) {
+						if (_battery_status_sub.updated()) {
+							battery_status_s battery_status;
+
+							if (_battery_status_sub.copy(&battery_status) && battery_status.connected && battery_status.scale > 0.f) {
+								_battery_status_scale = battery_status.scale;
+							}
+						}
+
+						if (_battery_status_scale > 0.0f) {
+							for (int i = 0; i < 4; i++) {
+								actuators.control[i] *= _battery_status_scale;
+							}
+						}
+					}
+
+					actuators.timestamp = hrt_absolute_time();
+					_actuators_0_pub.publish(actuators);
+
+					updateActuatorControlsStatus(actuators, dt);
+					PX4_INFO("Thrust: %f roll: %f pitch %f yaw %f", (double)thrust_sp, (double)roll_sp, (double)pitch_sp, (double)yaw_sp);
+				}
+				else{
+					PX4_WARN("this failed");
+					actuator_controls_s actuators{};
+				actuators.control[actuator_controls_s::INDEX_ROLL] = 0.0f;
+				actuators.control[actuator_controls_s::INDEX_PITCH] = 0.0f;
+				actuators.control[actuator_controls_s::INDEX_YAW] = 0.0f;
+				actuators.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
 				actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
 				actuators.timestamp_sample = angular_velocity.timestamp_sample;
+
+				if (!_vehicle_status.is_vtol) {
+					publishTorqueSetpoint(att_control, angular_velocity.timestamp_sample);
+					publishThrustSetpoint(angular_velocity.timestamp_sample);
+				}
 
 				// scale effort by battery status if enabled
 				if (_param_mc_bat_scale_en.get()) {
@@ -300,10 +346,11 @@ MulticopterRateControl::Run()
 				_actuators_0_pub.publish(actuators);
 
 				updateActuatorControlsStatus(actuators, dt);
+				}
 			}
 			else
 			{
-				//PX4_INFO("Thrust: %f, roll: %f, pitch: %f, yaw: %f",(double)_thrust_sp,(double)att_control(0),(double)att_control(1),(double)att_control(2));
+				// PX4_INFO("Thrust: %f, roll: %f, pitch: %f, yaw: %f",(double)_thrust_sp,(double)att_control(0),(double)att_control(1),(double)att_control(2));
 				// publish actuator controls
 				actuator_controls_s actuators{};
 				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;

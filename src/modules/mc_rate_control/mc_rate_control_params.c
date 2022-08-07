@@ -40,6 +40,17 @@
  */
 
 /**
+ * Allow External Controller Input
+ *
+ * True: Use external input. Will allow even if offboard mode is not active
+ * False: Will use PX4 rate controller only
+ *
+ * @boolean
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_INT32(MC_EXT_CONTROL, 0);
+
+/**
  * Roll rate P gain
  *
  * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.

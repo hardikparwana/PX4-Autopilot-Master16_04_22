@@ -58,11 +58,11 @@ rtps:
     send:    true
   - msg:     vehicle_angular_velocity
     send:    true
-  - msg:     external_actuator_controls
-    receive: true
   - msg:     vehicle_attitude
     send:    true
   - msg:     external_controller
+    receive: true
+  - msg:     external_actuator_controls
     receive: true
 
 
